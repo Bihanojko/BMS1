@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <math.h>
 #include <iostream>
+#include <fstream>
 
 #include "sndfile.hh"
 
@@ -24,15 +25,14 @@ int main(int argc, char** argv) {
     }
 
     std::string filename = argv[1];
-    inputFile = SndfileHandle(filename);
+    SndfileHandle inputFile = SndfileHandle(filename);
 
     if (filename.find('.') != std::string::npos)
         filename = filename.substr(0, filename.find_last_of('.'));
 
-    ofstream outputFile;
+    std::ofstream outputFile;
     outputFile.open(filename);
 
-    SndfileHandle inputFile;
     int sampleRate;
     int *buffer;
         
