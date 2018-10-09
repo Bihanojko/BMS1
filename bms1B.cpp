@@ -23,12 +23,19 @@ int main(int argc, char** argv) {
 		return EXIT_FAILURE;
     }
 
+    std::string filename = argv[1];
+    inputFile = SndfileHandle(filename);
+
+    if (filename.find('.') != std::string::npos)
+        filename = filename.substr(0, filename.find_last_of('.'));
+
+    ofstream outputFile;
+    outputFile.open(filename);
+
     SndfileHandle inputFile;
     int sampleRate;
     int *buffer;
-    
-    inputFile = SndfileHandle("sine.waw");
-    
+        
     sampleRate = inputFile.samplerate();
     
     buffer = new int[sampleRate];
@@ -36,6 +43,6 @@ int main(int argc, char** argv) {
     inputFile.read(buffer, sampleRate);
     
     delete [] buffer;
+    outputFile.close();
     return EXIT_SUCCESS;
 }
-
