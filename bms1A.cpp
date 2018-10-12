@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include <math.h>
 #include <iostream>
+#include <fstream>
+#include <iomanip>
 
 #include "sndfile.hh"
 
@@ -19,10 +21,11 @@
 #define FORMAT (SF_FORMAT_WAV | SF_FORMAT_PCM_24)
 #define AMPLITUDE (1.0 * 0x7F000000)
 #define FREQ (1000.0 / SAMPLE_RATE)
+#define BITRATE 1500
 
 
-int main(int argc, char** argv) {
-
+int main(int argc, char** argv)
+{
     if (argc != 2)
     {
         std::cerr <<  "Invalid argument count! Usage: ./bms1A filename.txt" << std::endl;
@@ -30,19 +33,43 @@ int main(int argc, char** argv) {
     }
 
     std::string filename = argv[1];
+    std::ifstream inputFile;
+    inputFile.open(filename);
+
+    if (!inputFile.is_open())
+    {
+        std::cerr <<  "Unable to open input file: " << filename << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    SndfileHandle outputFile;
 
     if (filename.find('.') != std::string::npos)
         filename = filename.substr(0, filename.find_last_of('.'));
 
-    SndfileHandle outputFile;
-    int *buffer = new int[SAMPLE_RATE];
-    
-    for (int i = 0; i < SAMPLE_RATE; i++)
-        buffer [i] = AMPLITUDE * sin(FREQ * 2 * i * M_PI);
+    outputFile = SndfileHandle(filename + ".wav", SFM_WRITE, FORMAT, CHANELS, SAMPLE_RATE);
 
-    outputFile = SndfileHandle(filename + ".waw", SFM_WRITE, FORMAT, CHANELS, SAMPLE_RATE);
+    int* buffer = new int[SAMPLE_RATE];
+   
+    for (int i = 0; i < 4; i += 2)
+    {
+        for (int j = 0; j < SAMPLE_RATE / BITRATE; ++j)
+        {
+            std::cout << std::setprecision(4) << AMPLITUDE * sin(FREQ * 2 * i * M_PI) << "   ";
+            buffer[i + j] = AMPLITUDE * sin(FREQ * 2 * i * M_PI);
+        }
 
-    outputFile.write(buffer, SAMPLE_RATE);
+        for (int j = 0; j < SAMPLE_RATE / BITRATE; ++j)
+        {
+            std::cout << std::setprecision(4) << 0 << "   ";
+            buffer[i + j] = 0;
+        }
+    }
+
+    outputFile.write(buffer, SAMPLE_RATE / BITRATE);
+
+    inputFile.close();
+
 
     delete [] buffer;
     return EXIT_SUCCESS;
