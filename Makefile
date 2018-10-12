@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -Wall -pedantic -O2 -no-pie
+CFLAGS=-std=c++11 -Wall -pedantic -O2
 LIBS=-lm
 
 all: bms1A bms1B
