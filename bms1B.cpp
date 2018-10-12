@@ -16,8 +16,8 @@
 #include "sndfile.hh"
 
 
-int main(int argc, char** argv) {
-    
+int main(int argc, char** argv)
+{    
     if (argc != 2)
     {
 		std::cerr <<  "Invalid argument count! Usage: ./bms1B filename.wav" << std::endl;
@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
     outputFile.open(filename);
 
     int sampleRate;
-    int *buffer;
+    int* buffer;
         
     sampleRate = inputFile.samplerate();
     
