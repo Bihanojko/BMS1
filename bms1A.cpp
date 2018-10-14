@@ -10,18 +10,61 @@
 
 #include <cstdlib>
 #include <math.h>
+#include <cstring>
 #include <iostream>
 #include <fstream>
-#include <iomanip>
 
 #include "sndfile.hh"
 
-#define SAMPLE_RATE 18000
+// TODO dafuq? proc zrovna 24000??? vvvv puvodne bylo 18000
+#define SAMPLE_RATE 24000
 #define CHANELS 1
 #define FORMAT (SF_FORMAT_WAV | SF_FORMAT_PCM_24)
 #define AMPLITUDE (1.0 * 0x7F000000)
 #define FREQ (1000.0 / SAMPLE_RATE)
-#define BITRATE 1500
+
+// TODO co to je??? vvvvv
+#define BITRATE 1350
+
+
+SndfileHandle CreateOutputFile(std::string filename)
+{
+    SndfileHandle outputFile;
+
+    if (filename.substr(filename.length() - std::strlen(".txt")) == ".txt")
+        filename = filename.substr(0, filename.length() - std::strlen(".txt"));
+
+    return SndfileHandle(filename + ".wav", SFM_WRITE, FORMAT, CHANELS, SAMPLE_RATE);
+}
+
+
+int* CreateSynchSequence()
+{
+    int index = - SAMPLE_RATE / BITRATE;
+    int* buffer = new int[SAMPLE_RATE / BITRATE * 4];
+
+    for (int i = 0; i < SAMPLE_RATE / BITRATE * 4; i += SAMPLE_RATE / BITRATE * 2)
+    {
+        for (int j = 0; j < SAMPLE_RATE / BITRATE; ++j)
+            buffer[i + j] = 0;
+
+        index += SAMPLE_RATE / BITRATE * 2;
+
+        for (int j = 0; j < SAMPLE_RATE / BITRATE; ++j)
+            buffer[i + j + SAMPLE_RATE / BITRATE] = AMPLITUDE * sin(FREQ * 2 * (index + j) * M_PI);
+    }
+
+    return buffer;
+}
+
+
+int* ApplyModulation(int signalStrength, int index, int* buffer)
+{
+    for (int i = 0; i < SAMPLE_RATE / BITRATE; ++i)
+        buffer[i] = signalStrength * sin(FREQ * 2 * (index + i) * M_PI);
+
+    return buffer;
+}
 
 
 int main(int argc, char** argv)
@@ -34,7 +77,7 @@ int main(int argc, char** argv)
 
     std::string filename = argv[1];
     std::ifstream inputFile;
-    inputFile.open(filename);
+    inputFile.open(filename.c_str());
 
     if (!inputFile.is_open())
     {
@@ -42,35 +85,36 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    SndfileHandle outputFile;
+    int* buffer = CreateSynchSequence();
+    SndfileHandle outputFile = CreateOutputFile(filename);
+    outputFile.write(buffer, SAMPLE_RATE / BITRATE * 4);
 
-    if (filename.find('.') != std::string::npos)
-        filename = filename.substr(0, filename.find_last_of('.'));
+    int index = 0;
+    char currentChar, nextChar;
 
-    outputFile = SndfileHandle(filename + ".wav", SFM_WRITE, FORMAT, CHANELS, SAMPLE_RATE);
-
-    int* buffer = new int[SAMPLE_RATE];
-   
-    for (int i = 0; i < 4; i += 2)
+    while (inputFile >> currentChar && inputFile >> nextChar)
     {
-        for (int j = 0; j < SAMPLE_RATE / BITRATE; ++j)
+        if (currentChar == '0' && nextChar == '0')
+            buffer = ApplyModulation(0, index, buffer);
+        else if (currentChar == '0' && nextChar == '1')
+            buffer = ApplyModulation(AMPLITUDE / 3, index, buffer);
+        else if (currentChar == '1' && nextChar == '0')
+            buffer = ApplyModulation(AMPLITUDE / 3 * 2, index, buffer);
+        else if (currentChar == '1' && nextChar == '1')
+            buffer = ApplyModulation(AMPLITUDE, index, buffer);
+        else
         {
-            std::cout << std::setprecision(4) << AMPLITUDE * sin(FREQ * 2 * i * M_PI) << "   ";
-            buffer[i + j] = AMPLITUDE * sin(FREQ * 2 * i * M_PI);
+            std::cerr << "Input file contains invalid data!" << std::endl;
+            inputFile.close();
+            delete [] buffer;
+            return EXIT_FAILURE;
         }
 
-        for (int j = 0; j < SAMPLE_RATE / BITRATE; ++j)
-        {
-            std::cout << std::setprecision(4) << 0 << "   ";
-            buffer[i + j] = 0;
-        }
+        outputFile.write(buffer, SAMPLE_RATE / BITRATE);
+        index += SAMPLE_RATE / BITRATE;
     }
 
-    outputFile.write(buffer, SAMPLE_RATE / BITRATE);
-
     inputFile.close();
-
-
     delete [] buffer;
     return EXIT_SUCCESS;
 }
