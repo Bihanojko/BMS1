@@ -140,7 +140,7 @@ int main(int argc, char** argv)
         {
             std::cerr << "Invalid synchronization sequence!" << std::endl;
             outputFile.close();
-            EXIT_FAILURE;
+            return EXIT_FAILURE;
         }
     }
 
