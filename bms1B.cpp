@@ -29,6 +29,11 @@ std::ofstream CreateOutputFile(std::string filename)
 
     if (filename.substr(filename.length() - std::strlen(".wav")) == ".wav")
         filename = filename.substr(0, filename.length() - std::strlen(".wav"));
+    else
+    {
+        std::cerr <<  "Invalid input filename! Expecting a file ending with \'.wav\'." << std::endl;
+        exit(EXIT_FAILURE);
+    }
 
     outputFile.open((filename + ".txt").c_str());
     return outputFile;
