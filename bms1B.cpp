@@ -120,7 +120,7 @@ int main(int argc, char** argv)
     }
 
     // skip and check synchronization sequence
-    for (int i = 0; i < 3, last <= samples.end(); first = last, last += sampleCount, ++i)
+    for (int i = 0; i < 3 && last <= samples.end(); first = last, last += sampleCount, ++i)
     {
         // get value of amplitude in current section
         currentAmplitude = GetMaxAbsValue(first, last);
