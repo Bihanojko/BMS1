@@ -23,21 +23,28 @@
 #define AMPLITUDE (1.0 * 0x7F000000)
 #define FREQ (1000.0 / SAMPLE_RATE)
 
-// TODO co to je??? vvvvv
+// TODO co to je??? vvvvv BAUDRATE???
 #define BITRATE 1350
 
 
+// create and open output file
 SndfileHandle CreateOutputFile(std::string filename)
 {
     SndfileHandle outputFile;
 
     if (filename.substr(filename.length() - std::strlen(".txt")) == ".txt")
         filename = filename.substr(0, filename.length() - std::strlen(".txt"));
+    else
+    {
+        std::cerr <<  "Invalid input filename! Expecting a file ending with \'.txt\'." << std::endl;
+        exit(EXIT_FAILURE);
+    }
 
     return SndfileHandle(filename + ".wav", SFM_WRITE, FORMAT, CHANELS, SAMPLE_RATE);
 }
 
 
+// create synchronization sequence and return it
 int* CreateSynchSequence()
 {
     int index = - SAMPLE_RATE / BITRATE;
@@ -67,18 +74,22 @@ int* ApplyModulation(int signalStrength, int index, int* buffer)
 }
 
 
+// MAIN
 int main(int argc, char** argv)
 {
+    // check the number of arguments
     if (argc != 2)
     {
         std::cerr <<  "Invalid argument count! Usage: ./bms1A filename.txt" << std::endl;
         return EXIT_FAILURE;
     }
 
+    // open input file
     std::string filename = argv[1];
     std::ifstream inputFile;
     inputFile.open(filename.c_str());
 
+    // check if input file was opened successfully
     if (!inputFile.is_open())
     {
         std::cerr <<  "Unable to open input file: " << filename << std::endl;
