@@ -2,7 +2,7 @@
  * Project 1
  * Subject: Wireless and Mobile Networks
  * Author:  Nikola Valesova
- * Date:    14. 10. 2018
+ * Date:    3. 11. 2018
  * Faculty of Information Technology
  * Brno University of Technology
  * File:    bms1A.cpp
@@ -16,15 +16,14 @@
 
 #include "sndfile.hh"
 
-// TODO dafuq? proc zrovna 24000??? vvvv puvodne bylo 18000
-#define SAMPLE_RATE 24000
+#define SAMPLE_RATE 18000
 #define CHANELS 1
 #define FORMAT (SF_FORMAT_WAV | SF_FORMAT_PCM_24)
 #define AMPLITUDE (1.0 * 0x7F000000)
 #define FREQ (1000.0 / SAMPLE_RATE)
 
-// TODO co to je??? vvvvv BAUDRATE???
-#define BITRATE 1350
+// number of modulated values used to represent one digram
+#define SAMPLES_PER_DIGRAM (SAMPLE_RATE / 600)
 
 
 // create and open output file
@@ -45,30 +44,37 @@ SndfileHandle CreateOutputFile(std::string filename)
 
 
 // create synchronization sequence and return it
-int* CreateSynchSequence()
+int* CreateSynchSequence(int& index)
 {
-    int index = - SAMPLE_RATE / BITRATE;
-    int* buffer = new int[SAMPLE_RATE / BITRATE * 4];
+    int* buffer = new int[SAMPLES_PER_DIGRAM * 4];
 
-    for (int i = 0; i < SAMPLE_RATE / BITRATE * 4; i += SAMPLE_RATE / BITRATE * 2)
+    // modulate synchronization sequence "0011"
+    for (int i = 0; i < 2; ++i)
     {
-        for (int j = 0; j < SAMPLE_RATE / BITRATE; ++j)
-            buffer[i + j] = 0;
+        // modulate "00"
+        for (int j = 0; j < SAMPLES_PER_DIGRAM; ++j)
+        {
+            buffer[index] = 0.0;
+            ++index;
+        }
 
-        index += SAMPLE_RATE / BITRATE * 2;
-
-        for (int j = 0; j < SAMPLE_RATE / BITRATE; ++j)
-            buffer[i + j + SAMPLE_RATE / BITRATE] = AMPLITUDE * sin(FREQ * 2 * (index + j) * M_PI);
+        // modulate "11"
+        for (int j = 0; j < SAMPLES_PER_DIGRAM; ++j)
+        {
+            buffer[index] = AMPLITUDE * sin(FREQ * 2 * index * M_PI);
+            ++index;
+        }
     }
 
     return buffer;
 }
 
 
-int* ApplyModulation(int signalStrength, int index, int* buffer)
+// create modulated sequence for current digram
+int* ApplyModulation(int signalStrength, int& index, int* buffer)
 {
-    for (int i = 0; i < SAMPLE_RATE / BITRATE; ++i)
-        buffer[i] = signalStrength * sin(FREQ * 2 * (index + i) * M_PI);
+    for (int i = 0; i < SAMPLES_PER_DIGRAM; ++i, ++index)
+        buffer[i] = signalStrength * sin(FREQ * 2 * index * M_PI);
 
     return buffer;
 }
@@ -96,21 +102,24 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    int* buffer = CreateSynchSequence();
-    SndfileHandle outputFile = CreateOutputFile(filename);
-    outputFile.write(buffer, SAMPLE_RATE / BITRATE * 4);
-
     int index = 0;
+    // modulate synchronization sequence
+    int* buffer = CreateSynchSequence(index);
+    SndfileHandle outputFile = CreateOutputFile(filename);
+    outputFile.write(buffer, SAMPLES_PER_DIGRAM * 4);
+
+    // for storing digram that is being modulated
     char currentChar, nextChar;
 
+    // digram modulation
     while (inputFile >> currentChar && inputFile >> nextChar)
     {
         if (currentChar == '0' && nextChar == '0')
-            buffer = ApplyModulation(0, index, buffer);
+            buffer = ApplyModulation(0.0, index, buffer);
         else if (currentChar == '0' && nextChar == '1')
-            buffer = ApplyModulation(AMPLITUDE / 3, index, buffer);
+            buffer = ApplyModulation(AMPLITUDE / 3.0, index, buffer);
         else if (currentChar == '1' && nextChar == '0')
-            buffer = ApplyModulation(AMPLITUDE / 3 * 2, index, buffer);
+            buffer = ApplyModulation(AMPLITUDE / 3.0 * 2, index, buffer);
         else if (currentChar == '1' && nextChar == '1')
             buffer = ApplyModulation(AMPLITUDE, index, buffer);
         else
@@ -121,8 +130,8 @@ int main(int argc, char** argv)
             return EXIT_FAILURE;
         }
 
-        outputFile.write(buffer, SAMPLE_RATE / BITRATE);
-        index += SAMPLE_RATE / BITRATE;
+        // write modulated digram to output file
+        outputFile.write(buffer, SAMPLES_PER_DIGRAM);
     }
 
     inputFile.close();
