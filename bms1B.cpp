@@ -18,14 +18,13 @@
 
 #include "sndfile.hh"
 
-#define AMPLITUDE (1.0 * 0x7F000000)
-
 
 // create and open output file
 std::ofstream CreateOutputFile(std::string filename)
 {
     std::ofstream outputFile;
 
+    // remove ".wav" extension
     if (filename.substr(filename.length() - std::strlen(".wav")) == ".wav")
         filename = filename.substr(0, filename.length() - std::strlen(".wav"));
     else
@@ -34,6 +33,7 @@ std::ofstream CreateOutputFile(std::string filename)
         exit(EXIT_FAILURE);
     }
 
+    // open output file
     outputFile.open((filename + ".txt").c_str());
     return outputFile;
 }
@@ -42,8 +42,8 @@ std::ofstream CreateOutputFile(std::string filename)
 // load input sequence from input file
 std::vector<int> LoadInput(SndfileHandle &inputFile)
 {
-	int sample = 0;
-    std::vector<int> samples; 
+	int sample;
+    std::vector<int> samples;
 
 	while (inputFile.read(&sample, 1) == 1)
 		samples.push_back(sample);
@@ -98,7 +98,7 @@ std::vector<int> GetLengths(SndfileHandle inputFile)
 
     inputFile.read(&currentChar, 1);
 
-    // get the number of zero samples at the beginning
+    // get the number of zero samples at the beginning of synchronization sequence
     lengths.push_back(GetZerosLength(inputFile, currentChar));
     // get the number of non-zero samples
     lengths.push_back(GetNonZerosLength(inputFile, currentChar));
@@ -115,10 +115,10 @@ std::vector<int> GetLengths(SndfileHandle inputFile)
 // determine the number of values per single digram based on lengths of subsequences
 int DetermineSamplesCount(std::vector<int> lengths)
 {
-    // TODO
+    // last read zero in the first subsequence was already the first sample of the sine wave
     if (lengths[0] == lengths[2] && lengths[0] == lengths[1] + 2)
         return lengths[0] - 1;
-    // all parts had the same length or TODO
+    // all subsequences had the same length or the last sample in the second subsequence should have been the last zero 
     else
         return lengths[0];
 }
@@ -129,10 +129,29 @@ unsigned int GetSamplesPerDigram(SndfileHandle inputFile, int& readValuesCount)
 {
     // get lengths of zero and non-zero parts
     std::vector<int> lengths = GetLengths(inputFile);
+    // determine the number of samples per digram
     int samplesPerDigram = DetermineSamplesCount(lengths);
+    // compute the number of already skipped values from synchronization sequence
     readValuesCount = lengths[0] + lengths[1] + lengths[2];
 
     return samplesPerDigram;
+}
+
+
+// read and return the rest of synchronization sequence
+std::vector<int> SkipSynchSequence(SndfileHandle &inputFile, int toBeSkipped)
+{
+    int counter = 0;
+	int sample;
+    std::vector<int> samples;
+
+	while (counter < toBeSkipped && inputFile.read(&sample, 1) == 1)
+    {
+		samples.push_back(sample);
+        ++counter;
+    }
+
+    return samples;
 }
 
 
@@ -143,6 +162,16 @@ int GetMaxAbsValue(std::vector<int>::const_iterator &first, std::vector<int>::co
     int max = *std::max_element(first, last);
 
     return std::abs(min) > max ? std::abs(min) : max;
+}
+
+
+// get the maximum amplitude value of part of signal in samples
+int GetMaxAmplitude(std::vector<int> samples)
+{
+    std::vector<int>::const_iterator first = samples.begin();
+    std::vector<int>::const_iterator last = samples.end();
+
+    return GetMaxAbsValue(first, last);
 }
 
 
@@ -169,15 +198,19 @@ int main(int argc, char** argv)
     }
 
     int readValuesCount;
+    // get the number of samples used to encode one digram
     unsigned int samplesPerDigram = GetSamplesPerDigram(inputFile, readValuesCount);
     unsigned int toBeSkipped = samplesPerDigram * 4 - readValuesCount - 1;
+    // read and skip the rest of synchronization sequence and determine the maximum amplitude from it
+    int maxAmplitude = GetMaxAmplitude(SkipSynchSequence(inputFile, toBeSkipped));
+    // load data from input file
     std::vector<int> samples = LoadInput(inputFile);
 
     int currentAmplitude = 0;
-    std::vector<int>::const_iterator first = samples.begin() + toBeSkipped;
-    std::vector<int>::const_iterator last = samples.begin() + toBeSkipped + samplesPerDigram;
+    std::vector<int>::const_iterator first = samples.begin();
+    std::vector<int>::const_iterator last = samples.begin() + samplesPerDigram;
 
-    // demodulate input sequence and output
+    // demodulate input sequence and write it to output file
     for (; last <= samples.end(); first = last, last += samplesPerDigram)
     {
         // get value of amplitude in current section
@@ -185,13 +218,13 @@ int main(int argc, char** argv)
 
         // demodulation
         // less than 16 % of amplitude value
-        if (currentAmplitude < AMPLITUDE / 6)
+        if (currentAmplitude < maxAmplitude / 6)
             outputFile << "00";
         // less than 50 % of amplitude value
-        else if (currentAmplitude < AMPLITUDE / 2)
+        else if (currentAmplitude < maxAmplitude / 6 * 3)
             outputFile << "01";
         // less than 83 % of amplitude value
-        else if (currentAmplitude < AMPLITUDE / 6 * 5)
+        else if (currentAmplitude < maxAmplitude / 6 * 5)
             outputFile << "10";
         // otherwise
         else
