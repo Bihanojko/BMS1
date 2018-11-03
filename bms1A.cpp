@@ -31,6 +31,7 @@ SndfileHandle CreateOutputFile(std::string filename)
 {
     SndfileHandle outputFile;
 
+    // remove ".txt" extension from filename
     if (filename.substr(filename.length() - std::strlen(".txt")) == ".txt")
         filename = filename.substr(0, filename.length() - std::strlen(".txt"));
     else
@@ -39,6 +40,7 @@ SndfileHandle CreateOutputFile(std::string filename)
         exit(EXIT_FAILURE);
     }
 
+    // open and return output file
     return SndfileHandle(filename + ".wav", SFM_WRITE, FORMAT, CHANELS, SAMPLE_RATE);
 }
 
